@@ -1,4 +1,4 @@
-# Pro Thumbnail API Service
+# Thumbnail API Service
 
 A robust, asynchronous microservice for production-grade image resizing and thumbnail generation. Built with **FastAPI**, **Pillow**, and **SQLite**.
 
@@ -90,7 +90,9 @@ Start the FastAPI server using Uvicorn:
 ```bash
 python -m uvicorn src.api.service:app --host 0.0.0.0 --port 8000 --reload
 ```
+
 The API will be available at http://localhost:8000. You can view the interactive Swagger documentation at http://localhost:8000/docs.
+
 ---
 ## 5. Testing Instructions
 The project includes a suite of 40 tests (30 Unit, 10 Integration) covering every layer of the stack to ensure stability and prevent regressions.
