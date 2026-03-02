@@ -3,11 +3,7 @@ import traceback
 from PIL import Image
 from src.api.models import update_resize_status
 
-PRESETS = {
-    "small": (128, 128),
-    "medium": (512, 512),
-    "large": (1024, 1024)
-}
+PRESETS = {"small": (128, 128), "medium": (512, 512), "large": (1024, 1024)}
 
 
 def process_image(image_id, original_path, preset, custom_w=None, custom_h=None):
@@ -24,7 +20,10 @@ def process_image(image_id, original_path, preset, custom_w=None, custom_h=None)
             scaling_factor = min(ratio_w, ratio_h)
 
             # 3. Calculate new dimensions (preserving aspect ratio)
-            new_size = (int(img.width * scaling_factor), int(img.height * scaling_factor))
+            new_size = (
+                int(img.width * scaling_factor),
+                int(img.height * scaling_factor),
+            )
 
             # 4. Resize (Using .resize instead of .thumbnail to FORCE scaling up)
             resized_img = img.resize(new_size, Image.Resampling.LANCZOS)
@@ -35,7 +34,7 @@ def process_image(image_id, original_path, preset, custom_w=None, custom_h=None)
             # 6. Center the resized image on the canvas
             offset = (
                 (target_w - resized_img.width) // 2,
-                (target_h - resized_img.height) // 2
+                (target_h - resized_img.height) // 2,
             )
             canvas.paste(resized_img, offset)
 
@@ -46,7 +45,9 @@ def process_image(image_id, original_path, preset, custom_w=None, custom_h=None)
 
             update_resize_status(image_id, thumb_path, target_w, target_h, preset)
 
-        print(f"SUCCESS: {image_id} scaled to {new_size} on {target_w}x{target_h} canvas.")
+        print(
+            f"SUCCESS: {image_id} scaled to {new_size} on {target_w}x{target_h} canvas."
+        )
 
     except Exception as e:
         print(f"Error in Processor: {e}")

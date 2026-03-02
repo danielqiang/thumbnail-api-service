@@ -1,5 +1,4 @@
 import os
-import shutil
 import io
 import pytest
 from fastapi.testclient import TestClient
@@ -7,27 +6,31 @@ from PIL import Image
 
 # We import the app to test it, and models to verify side effects
 from src.api.service import app
-from src.api.models import get_metadata, DB_PATH
+from src.api.models import get_metadata, DB_PATH, init_db
 
 client = TestClient(app)
 
 
 @pytest.fixture(scope="module", autouse=True)
 def test_env_setup():
-    """Setup a clean testing environment before any tests run."""
-    # 1. Use a temporary test database
-    if os.path.exists("test_images.db"):
-        os.remove("test_images.db")
+    """Setup a clean testing environment for CI."""
+    # 1. Force absolute path for DB to avoid 'no such table' errors in CI
+    # This ensures SQLite knows exactly where the file should live
+    if os.path.exists(DB_PATH):
+        os.remove(DB_PATH)
 
-    # 2. Setup clean directories
+    # 2. MANUALLY initialize the schema for the test session
+    init_db()
+
+    # 3. Ensure directories exist
     os.makedirs("static/uploads", exist_ok=True)
     os.makedirs("static/thumbs", exist_ok=True)
 
-    yield  # Run tests
+    yield
 
-    # 3. Teardown: Clean up files but maybe keep the DB for debugging if needed
-    # shutil.rmtree("static/uploads")
-    # shutil.rmtree("static/thumbs")
+    # Optional: Clean up after tests finish
+    if os.path.exists(DB_PATH):
+        os.remove(DB_PATH)
 
 
 def create_img(w=100, h=100):
@@ -40,7 +43,9 @@ def create_img(w=100, h=100):
 # 1. Test Full Upload-to-Database Flow
 def test_upload_integration():
     img = create_img()
-    response = client.post("/upload", files={"files": ("int_test.png", img, "image/png")})
+    response = client.post(
+        "/upload", files={"files": ("int_test.png", img, "image/png")}
+    )
     assert response.status_code == 201
     img_id = response.json()["uploads"][0]["image_id"]
 
@@ -67,6 +72,7 @@ def test_resize_completion_integration():
 
     # In integration tests, we need to wait a split second for BackgroundTasks
     import time
+
     time.sleep(1)
 
     data = get_metadata(img_id)
@@ -83,6 +89,7 @@ def test_custom_resize_letterbox_integration():
 
     client.post(f"/resize/{img_id}/custom?width=200&height=200")
     import time
+
     time.sleep(1)
 
     data = get_metadata(img_id)
@@ -96,7 +103,7 @@ def test_custom_resize_letterbox_integration():
 def test_multiple_uploads_integration():
     files = [
         ("files", ("1.png", create_img(), "image/png")),
-        ("files", ("2.png", create_img(), "image/png"))
+        ("files", ("2.png", create_img(), "image/png")),
     ]
     response = client.post("/upload", files=files)
     assert len(response.json()["uploads"]) == 2
@@ -109,6 +116,7 @@ def test_get_file_binary_integration():
     img_id = res.json()["uploads"][0]["image_id"]
 
     import time
+
     time.sleep(1)
 
     response = client.get(f"/images/{img_id}/file")
@@ -123,6 +131,7 @@ def test_get_file_missing_physical_disk():
     img_id = res.json()["uploads"][0]["image_id"]
 
     import time
+
     time.sleep(1)
     data = get_metadata(img_id)
     os.remove(data["thumb_path"])  # Manually delete
@@ -145,10 +154,13 @@ def test_status_202_immediate_request():
 # 9. Test Input Validation for Malformed Image Data
 def test_upload_corrupt_file():
     bad_data = io.BytesIO(b"not an image at all")
-    response = client.post("/upload", files={"files": ("bad.png", bad_data, "image/png")})
+    response = client.post(
+        "/upload", files={"files": ("bad.png", bad_data, "image/png")}
+    )
     img_id = response.json()["uploads"][0]["image_id"]
 
     import time
+
     time.sleep(1)
     data = get_metadata(img_id)
     # Status should remain 'processing' or fail gracefully because engine caught exception
@@ -164,6 +176,7 @@ def test_preset_transition_integration():
     # Trigger small
     client.post(f"/resize/{img_id}/small")
     import time
+
     time.sleep(1)
 
     data = get_metadata(img_id)

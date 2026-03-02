@@ -53,7 +53,9 @@ class TestService:
 
     # 5. Test Custom Resize Validation (Missing width/height)
     @patch("src.api.service.get_metadata")
-    def test_custom_resize_validation_error(self, mock_get, mock_init, mock_engine, mock_save):
+    def test_custom_resize_validation_error(
+        self, mock_get, mock_init, mock_engine, mock_save
+    ):
         mock_get.return_value = {"original_path": "path"}
         # Custom preset without width or height query params should fail with 400
         response = client.post("/resize/uuid/custom")
@@ -69,7 +71,9 @@ class TestService:
 
     # 7. Test File Retrieval (Processing Status 202)
     @patch("src.api.service.get_metadata")
-    def test_get_file_still_processing(self, mock_get, mock_init, mock_engine, mock_save):
+    def test_get_file_still_processing(
+        self, mock_get, mock_init, mock_engine, mock_save
+    ):
         mock_get.return_value = {"status": "processing"}
         response = client.get("/images/uuid/file")
         assert response.status_code == 202
@@ -78,8 +82,13 @@ class TestService:
     # 8. Test File Retrieval (Missing from Disk 404)
     @patch("src.api.service.get_metadata")
     @patch("src.api.service.os.path.exists")
-    def test_get_file_missing_on_disk(self, mock_exists, mock_get, mock_init, mock_engine, mock_save):
-        mock_get.return_value = {"status": "completed", "thumb_path": "path/to/thumb.png"}
+    def test_get_file_missing_on_disk(
+        self, mock_exists, mock_get, mock_init, mock_engine, mock_save
+    ):
+        mock_get.return_value = {
+            "status": "completed",
+            "thumb_path": "path/to/thumb.png",
+        }
         mock_exists.return_value = False
         response = client.get("/images/uuid/file")
         assert response.status_code == 404

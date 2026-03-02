@@ -1,6 +1,11 @@
 import pytest
 from unittest.mock import patch, MagicMock
-from src.api.models import init_db, save_initial_upload, update_resize_status, get_metadata
+from src.api.models import (
+    init_db,
+    save_initial_upload,
+    update_resize_status,
+    get_metadata,
+)
 
 
 @patch("src.api.models.sqlite3.connect")
@@ -31,7 +36,7 @@ class TestModels:
 
         mock_conn.execute.assert_called_once_with(
             "INSERT INTO images (id, original_path, status) VALUES (?, ?, ?)",
-            ("id-123", "/path/orig.jpg", "processing")
+            ("id-123", "/path/orig.jpg", "processing"),
         )
 
     # 3. Test full update SQL mapping
@@ -56,7 +61,10 @@ class TestModels:
     # 5. Test dictionary return (Row Factory)
     def test_get_metadata_returns_dict(self, mock_connect):
         mock_conn = self._setup_mock(mock_connect)
-        mock_conn.execute.return_value.fetchone.return_value = {"id": "123", "status": "ok"}
+        mock_conn.execute.return_value.fetchone.return_value = {
+            "id": "123",
+            "status": "ok",
+        }
 
         result = get_metadata("123")
         assert result["id"] == "123"
@@ -72,6 +80,7 @@ class TestModels:
     # 7. Test DB connection parameters
     def test_db_connection_settings(self, mock_connect):
         from src.api.models import get_db
+
         self._setup_mock(mock_connect)
         get_db()
         mock_connect.assert_called_with("images.db", check_same_thread=False)
@@ -92,6 +101,7 @@ class TestModels:
     # 10. Test row_factory configuration
     def test_row_factory_is_sqlite_row(self, mock_connect):
         from src.api.models import get_db, sqlite3
+
         mock_conn = self._setup_mock(mock_connect)
         get_db()
         assert mock_conn.row_factory == sqlite3.Row

@@ -77,7 +77,9 @@ class TestEngine:
 
         process_image("id7", "fake.png", "small")
         # Ensure update_resize_status is called with the target box size, not the inner image size
-        mock_update.assert_called_once_with("id7", "static/thumbs/id7_small.png", 128, 128, "small")
+        mock_update.assert_called_once_with(
+            "id7", "static/thumbs/id7_small.png", 128, 128, "small"
+        )
 
     def test_mkdir_called(self, mock_mkdir, mock_update, mock_PIL):
         mock_img = MagicMock(width=100, height=100)

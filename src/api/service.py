@@ -33,7 +33,9 @@ def startup():
 
 
 @app.post("/upload", status_code=201)
-async def upload_images(background_tasks: BackgroundTasks, files: List[UploadFile] = File(...)):
+async def upload_images(
+    background_tasks: BackgroundTasks, files: List[UploadFile] = File(...)
+):
     results = []
     for file in files:
         if not file.content_type.startswith("image/"):
@@ -57,11 +59,11 @@ async def upload_images(background_tasks: BackgroundTasks, files: List[UploadFil
 
 @app.post("/resize/{image_id}/{preset}")
 async def resize_request(
-        image_id: str,
-        preset: ResizePreset,
-        background_tasks: BackgroundTasks,
-        width: Optional[int] = Query(None, gt=0),
-        height: Optional[int] = Query(None, gt=0)
+    image_id: str,
+    preset: ResizePreset,
+    background_tasks: BackgroundTasks,
+    width: Optional[int] = Query(None, gt=0),
+    height: Optional[int] = Query(None, gt=0),
 ):
     data = get_metadata(image_id)
     if not data:
@@ -70,7 +72,9 @@ async def resize_request(
     if preset == ResizePreset.custom and not (width or height):
         raise HTTPException(400, "Custom preset requires width and height")
 
-    background_tasks.add_task(process_image, image_id, data["original_path"], preset.value, width, height)
+    background_tasks.add_task(
+        process_image, image_id, data["original_path"], preset.value, width, height
+    )
     return {"message": "Task queued", "image_id": image_id}
 
 
@@ -93,7 +97,7 @@ async def get_file(image_id: str):
     if data["status"] != "completed":
         raise HTTPException(
             status_code=202,
-            detail="Image is still being processed. Please try again in a few seconds."
+            detail="Image is still being processed. Please try again in a few seconds.",
         )
 
     # Verify the file actually exists on the disk
@@ -101,6 +105,7 @@ async def get_file(image_id: str):
         raise HTTPException(status_code=404, detail="File missing from storage")
 
     return FileResponse(data["thumb_path"])
+
 
 if __name__ == "__main__":
     uvicorn.run("src.main:app", host="0.0.0.0", port=8000, reload=True)
