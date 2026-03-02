@@ -60,18 +60,6 @@ To ensure a consistent UI, the service implements **Letterboxing** (adding black
 3.  **Centering:** The scaled image is mathematically centered on the canvas, ensuring that "extra" space is distributed evenly as black bars.
 
 ---
-
-## 4. Execution & Build Instructions
-
-### Prerequisites
-* Python 3.10+
-* pip
-
-### Installation
-1. **Clone the repository:**
-   ```bash
-   git clone <your-repo-url>
-   cd thumbnail-api-service```
    
    
 ## 4. Execution & Build Instructions
@@ -103,7 +91,7 @@ Start the FastAPI server using Uvicorn:
 python -m uvicorn src.api.service:app --host 0.0.0.0 --port 8000 --reload
 ```
 The API will be available at http://localhost:8000. You can view the interactive Swagger documentation at http://localhost:8000/docs.
-
+---
 ## 5. Testing Instructions
 The project includes a suite of 40 tests (30 Unit, 10 Integration) covering every layer of the stack to ensure stability and prevent regressions.
 
@@ -132,7 +120,7 @@ These tests verify the full end-to-end flow, including background task execution
 ```bash
 pytest tst/integ/test_integ.py
 ```
-
+---
 ## 6. CI/CD
 **A GitHub Actions workflow (.github/workflows/main.yml) is configured to run the full test suite automatically on every push.**
 
