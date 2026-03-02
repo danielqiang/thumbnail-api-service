@@ -1,69 +1,106 @@
+import uuid
+import shutil
+import os
+from enum import Enum
+from typing import List, Optional
+
+import uvicorn
 from fastapi import FastAPI, UploadFile, File, Query, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
-from typing import List, Optional
-import uuid
-import os
+from fastapi.staticfiles import StaticFiles
 
-# Internal imports
+from src.api.models import init_db, save_initial_upload, get_metadata
 from src.resizer.engine import process_image
-from src.api.models import init_db, save_metadata, get_metadata
 
-app = FastAPI(title="Thumbnail Generation Service")
+app = FastAPI(title="Pro Thumbnail API")
 
-# Ensure directories exist for local storage
+# Initialize directories and DB
 os.makedirs("static/uploads", exist_ok=True)
 os.makedirs("static/thumbs", exist_ok=True)
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+class ResizePreset(str, Enum):
+    small = "small"
+    medium = "medium"
+    large = "large"
+    custom = "custom"
 
 
 @app.on_event("startup")
-def on_startup():
+def startup():
     init_db()
 
 
 @app.post("/upload", status_code=201)
-async def upload_images(
-        background_tasks: BackgroundTasks,
-        files: List[UploadFile] = File(...),
-        preset: str = Query("medium", enum=["small", "medium", "large"])
-):
-    """Requirement: Upload one or more images."""
+async def upload_images(background_tasks: BackgroundTasks, files: List[UploadFile] = File(...)):
     results = []
     for file in files:
         if not file.content_type.startswith("image/"):
-            continue  # Or raise HTTPException
+            continue
 
         file_id = str(uuid.uuid4())
-        extension = file.filename.split(".")[-1]
-        original_path = f"static/uploads/{file_id}.{extension}"
+        ext = file.filename.split(".")[-1] or "jpg"
+        original_path = f"static/uploads/{file_id}.{ext}"
 
-        # Async save to disk
         with open(original_path, "wb") as buffer:
-            buffer.write(await file.read())
+            shutil.copyfileobj(file.file, buffer)
 
-        # Requirement: Concurrency (Processing in background)
-        # In a real app, this would be Celery. Here, BackgroundTasks is perfect.
-        background_tasks.add_task(process_image, file_id, original_path, preset)
+        save_initial_upload(file_id, original_path)
 
-        results.append({"image_id": file_id, "status": "processing"})
+        # Auto-resize to medium as a default background task
+        background_tasks.add_task(process_image, file_id, original_path, "medium")
+        results.append({"image_id": file_id, "filename": file.filename})
 
     return {"uploads": results}
 
 
+@app.post("/resize/{image_id}/{preset}")
+async def resize_request(
+        image_id: str,
+        preset: ResizePreset,
+        background_tasks: BackgroundTasks,
+        width: Optional[int] = Query(None, gt=0),
+        height: Optional[int] = Query(None, gt=0)
+):
+    data = get_metadata(image_id)
+    if not data:
+        raise HTTPException(404, "Original image not found")
+
+    if preset == ResizePreset.custom and not (width or height):
+        raise HTTPException(400, "Custom preset requires width and height")
+
+    background_tasks.add_task(process_image, image_id, data["original_path"], preset.value, width, height)
+    return {"message": "Task queued", "image_id": image_id}
+
+
 @app.get("/images/{image_id}")
-async def get_image_metadata(image_id: str):
-    """Requirement: Retrieve metadata."""
-    metadata = get_metadata(image_id)
-    if not metadata:
-        raise HTTPException(status_code=404, detail="Image not found")
-    return metadata
+async def get_info(image_id: str):
+    data = get_metadata(image_id)
+    if not data:
+        raise HTTPException(404, "Not found")
+    return data
 
 
 @app.get("/images/{image_id}/file")
-async def get_image_file(image_id: str, thumb: bool = True):
-    """Requirement: Retrieval of generated files."""
-    metadata = get_metadata(image_id)
-    if not metadata:
-        raise HTTPException(status_code=404, detail="Image not found")
+async def get_file(image_id: str):
+    data = get_metadata(image_id)
 
-    path = metadata["thumb_path"] if thumb else metadata["original_path"]
-    return FileResponse(path)
+    if not data:
+        raise HTTPException(status_code=404, detail="Image record not found")
+
+    # CRITICAL: Prevent streaming a half-written file
+    if data["status"] != "completed":
+        raise HTTPException(
+            status_code=202,
+            detail="Image is still being processed. Please try again in a few seconds."
+        )
+
+    # Verify the file actually exists on the disk
+    if not os.path.exists(data["thumb_path"]):
+        raise HTTPException(status_code=404, detail="File missing from storage")
+
+    return FileResponse(data["thumb_path"])
+
+if __name__ == "__main__":
+    uvicorn.run("src.main:app", host="0.0.0.0", port=8000, reload=True)
